@@ -19,7 +19,15 @@ public class HttpContentGetter : MonoBehaviour
     [SerializeField]
     private GameObject menu;
     [SerializeField]
+    private GameObject drinkCard;
+    [SerializeField]
     private GameObject loadingScreen;
+    [SerializeField]
+    private Scrollbar scrollbarImages;
+    [SerializeField]
+    private GameObject CancelLoadCross;
+
+    private htmlParser html = new htmlParser();
 
     static string textResult = "";
     private int pageLoaded = 0;
@@ -35,11 +43,11 @@ public class HttpContentGetter : MonoBehaviour
         int nbChild = ImageParent.transform.childCount;
         for (int i = nbChild - 1; i >= 0; i--)
         {
-            GameObject.Destroy(ImageParent.transform.GetChild(nbChild).gameObject);
+            GameObject.Destroy(ImageParent.transform.GetChild(i).gameObject);
         }
     }
 
-    IEnumerator DownloadImage(string MediaUrl)
+    IEnumerator createPreviewImages(string MediaUrl)
     {
         UnityWebRequest request = UnityWebRequestTexture.GetTexture(MediaUrl);
         yield return request.SendWebRequest();
@@ -47,43 +55,37 @@ public class HttpContentGetter : MonoBehaviour
             Debug.Log(request.error);
         else
         {
-            // ImageComponent.texture = ((DownloadHandlerTexture) request.downloadHandler).texture;
-
             Texture2D tex = ((DownloadHandlerTexture)request.downloadHandler).texture;
             Sprite sprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(tex.width / 2, tex.height / 2));
-            //ImageComponent.GetComponent<Image>().overrideSprite = sprite;
+            GameObject instImg = Instantiate(ImagePrefab);
+            instImg.transform.SetParent(ImageParent.transform);
+            instImg.transform.GetComponent<Image>().sprite = sprite;
         }
     }
 
-    public async void createImages(string name, int number)
+    public async void imageTest(string _name, int number)
     {
+        var query = "http://images.google.com/images?q=" + _name + "&hl=en&imgsz=Medium";
+        string returnStr = await DownloadPageAsync(query);
+        string urlDelimiter = "<img class=\"t0fcAb\" alt=\"\" src=\"";
+        string endUrl = "\"/></div>";
+
         EmptyParent();
-        string prefixSearch = "https://www.google.com/search?q=";
-        string tags = "+%2B+cocktail&sxsrf=ALeKk01UHctxsQWoYrNnQQRmJeuH54zuUA:1612613995233&source=lnms&tbm=isch&sa=X&ved=2ahUKEwjOxuGin9XuAhUnE6YKHXZZAlwQ_AUoAXoECAcQAw&biw=1472&bih=1083";
-        string url = prefixSearch + name + tags;
-        string image_start = "<div id=\"islmp\" jsname=\"ixzLGF\"";
-        string image_delimiter = "<img class=\"rg_i Q4LuWd\" src=\"data:image/jpeg;base64,";
-        string srcUrl = " src=\"";
-        string strEnd = "\"";
-        string result = await DownloadPageAsync(url);
-        int indexStart = result.IndexOf(image_start);
-        if (indexStart != -1)
-            result = result.Substring(indexStart + image_start.Length);
         for (int i = 0; i < number; i++)
         {
-            int imageStartIndex = result.IndexOf(image_delimiter);
-            if (imageStartIndex != -1)
-                result = result.Substring(imageStartIndex + image_delimiter.Length);
-            int startUrl = result.IndexOf(srcUrl);
-            string urlContent = "";
-            if (startUrl != -1)
+            var startIndex = returnStr.IndexOf(urlDelimiter);
+            if (startIndex != -1)
+                returnStr = returnStr.Substring(startIndex + urlDelimiter.Length);
+            var endIndex = returnStr.IndexOf(endUrl);
+            if (endIndex != -1)
             {
-                result = result.Substring(startUrl + srcUrl.Length);
-                int endUrl = result.IndexOf(strEnd);
-                urlContent = result.Substring(0, endUrl);
-                Debug.Log(urlContent);
+                string tempurl = returnStr.Substring(0, endIndex);
+                StartCoroutine(createPreviewImages(tempurl));
             }
+            returnStr = returnStr.Substring(endIndex + endUrl.Length);
         }
+        loadingScreen.SetActive(false);
+        scrollbarImages.value = 0;
     }
 
     private string cleanFromAElement(string rawText)
@@ -122,100 +124,16 @@ public class HttpContentGetter : MonoBehaviour
     public async Task<string> getCocktailDescription(string name)
     {
         string baseUrl = "https://wiki.webtender.com/wiki/";
-        string recipeStart = "<div lang=\"en\" dir=\"ltr\" class=\"mw-content-ltr\">";
-        string recipeEnd = "<!-- \nNewPP limit report";
-
-
-        string ingredientDelimiterStart = "<li>";
-        string ingredientDelimiterEnd = "</li>";
-
-        string descriptionStart = "<p>";
-        string descriptionEnd = "</p>";
-
-        string AllRecipeEnd = "<span class=\"mw-headline\" id=\"";
-        string similarRecipeEnd = "<span class=\"mw-headline\" id=\"Similar_";
 
         string resultPage = await DownloadPageAsync(baseUrl + name);
-        Debug.Log(resultPage);
-        resultPage = customSubStr(resultPage, recipeStart, recipeEnd);
-        int similarRecipeIndex = resultPage.IndexOf(similarRecipeEnd);
-        if (similarRecipeIndex != -1)
-           resultPage = resultPage.Substring(0, similarRecipeIndex);
-        Debug.Log(resultPage);
-        string finalStr = name;
-        int isDescription = resultPage.IndexOf(descriptionStart);
-        int endDescription = resultPage.IndexOf(descriptionEnd);
-        int allRecipeIndex = resultPage.IndexOf(AllRecipeEnd);
-
-        if (isDescription < endDescription && isDescription != -1 && endDescription != -1)
-            finalStr += "\nDescription:\n";
-        while (isDescription < allRecipeIndex && isDescription < endDescription && isDescription != -1 && endDescription != -1)
-        {
-            string category = customSubStr(resultPage, descriptionStart, descriptionEnd);
-            finalStr += cleanFromAElement(category);
-            resultPage = resultPage.Substring(endDescription + descriptionEnd.Length);
-            isDescription = resultPage.IndexOf(descriptionStart);
-            endDescription = resultPage.IndexOf(descriptionEnd);
-        }
-        finalStr += "\n\nRecipe:\n\n";
-        allRecipeIndex = resultPage.IndexOf(AllRecipeEnd);
-        if (allRecipeIndex != -1)
-        {
-            resultPage = resultPage.Substring(allRecipeIndex + AllRecipeEnd.Length);
-        }
-        List<string> ingredients = new List<string>();
-        while (resultPage.Contains(ingredientDelimiterStart) && resultPage.Contains(ingredientDelimiterEnd))
-        {
-            int startIndex = resultPage.IndexOf(ingredientDelimiterStart);
-            int endIndex = resultPage.IndexOf(ingredientDelimiterEnd);
-            isDescription = resultPage.IndexOf(descriptionStart);
-            endDescription = resultPage.IndexOf(descriptionEnd);
-            while (
-                isDescription < endDescription &&
-                isDescription != -1 &&
-                endDescription != -1 &&
-                isDescription < startIndex)
-            {
-                string category = customSubStr(resultPage, ingredientDelimiterStart, ingredientDelimiterEnd);
-                category = cleanFromAElement(category);
-                finalStr += category + "\n";
-                resultPage = resultPage.Substring(endDescription + descriptionEnd.Length);
-                startIndex = resultPage.IndexOf(ingredientDelimiterStart);
-                endIndex = resultPage.IndexOf(ingredientDelimiterEnd);
-                isDescription = resultPage.IndexOf(descriptionStart);
-                endDescription = resultPage.IndexOf(descriptionEnd);
-            }
-            startIndex = resultPage.IndexOf(ingredientDelimiterStart);
-            endIndex = resultPage.IndexOf(ingredientDelimiterEnd);
-            if (startIndex < endIndex)
-            {
-                string category = customSubStr(resultPage, ingredientDelimiterStart, ingredientDelimiterEnd);
-                category = cleanFromAElement(category);
-                finalStr += "• " + category + "\n";
-            }
-            if (endIndex != -1)
-            {
-                resultPage = resultPage.Substring(endIndex + ingredientDelimiterEnd.Length);
-            }
-            else
-            {
-                break;
-            }
-        }
-        foreach (string ingredient in ingredients)
-        {
-            finalStr += "• " + ingredient + "\n";
-        }
-        finalStr += resultPage;
-        return finalStr;
+        resultPage = html.htmlExtract(resultPage);
+        return resultPage;
     }
 
     static void Main(string url)
     {
         Task t = new Task(() => DownloadPageAsync(url));
         t.Start();
-        Console.WriteLine("Downloading page...");
-        Console.ReadLine();
     }
 
     static async Task<string> DownloadPageAsync(string url)
@@ -235,21 +153,6 @@ public class HttpContentGetter : MonoBehaviour
         return pageResult;
     }
 
-    private string customSubStr(string original, string start, string end)
-    {
-        if (original == "")
-            return "";
-        int startIndex = original.IndexOf(start);
-        int endIndex = original.IndexOf(end);
-        string subresult = "";
-        if (startIndex != -1 && endIndex != -1)
-        {
-            startIndex += start.Length;
-            subresult = original.Substring(startIndex, endIndex - startIndex);
-        }
-        return subresult;
-    }
-
     private void getLetterCategories(string rawText)
     {
         string beginningCategory = "<h3>";
@@ -257,8 +160,7 @@ public class HttpContentGetter : MonoBehaviour
 
         while(rawText.Contains(beginningCategory))
         {
-            string category = customSubStr(rawText, beginningCategory, separatorElement);
-            Debug.Log(category);
+            string category = html.customSubStr(rawText, beginningCategory, separatorElement);
             LetterCategories.Add(category);
             int endIndex = rawText.IndexOf(separatorElement);
             if (endIndex != -1)
@@ -280,10 +182,11 @@ public class HttpContentGetter : MonoBehaviour
 
         while (rawText.Contains(startNameBalise))
         {
-            string category = customSubStr(rawText, startNameBalise, endNameBalise);
-            category = customSubStr(category, startName, endName);
+            string category = html.customSubStr(rawText, startNameBalise, endNameBalise);
+            category = html.customSubStr(category, startName, endName);
+            category = html.removeElement(category, "&amp;", "");
+
             AllCocktails.Add(category);
-            Debug.Log(category);
             int endIndex = rawText.IndexOf(endNameBalise);
             if (endIndex != -1)
             {
@@ -300,7 +203,7 @@ public class HttpContentGetter : MonoBehaviour
         string beginningList = "<div lang=\"en\" dir=\"ltr\" class=\"mw-content-ltr\"><table width=\"100%\"><tr valign=\"top\">";
         string endList = "</td></tr></table></div>";
         
-        return customSubStr(rawText, beginningList, endList);
+        return html.customSubStr(rawText, beginningList, endList);
     }
 
     private async void getAllDrinks()
@@ -314,12 +217,12 @@ public class HttpContentGetter : MonoBehaviour
         {
             loadingScreen.SetActive(false);
             menu.SetActive(true);
+            CancelLoadCross.SetActive(true);
             pageLoaded = -1;
             return;
         }
         if (textResult == "")
         {
-            Debug.Log("Getting url " + PagesUrls[pageLoaded]);
             textResult = await Task.Run(() => DownloadPageAsync(PagesUrls[pageLoaded]));
         }
     }
@@ -329,12 +232,10 @@ public class HttpContentGetter : MonoBehaviour
         if (pageLoaded >= 0 && textResult.Length == 0 && called == false)
         {
             called = true;
-            Debug.Log("Get all Drinks (" + called + ")");
             getAllDrinks();
         }
         if (textResult.Length > 0 && called == true)
         {
-            Debug.Log("Parse Text (" + called + ")");
             string scrapedText = getDrinkListOnPage(textResult);
             textResult = scrapedText;
             getLetterCategories(scrapedText);

@@ -16,6 +16,10 @@ public class DrinkSelector : MonoBehaviour
     private GameObject Menu;
     [SerializeField]
     private GameObject Card;
+    [SerializeField]
+    private GameObject Loading;
+    [SerializeField]
+    private Scrollbar scrollbarText;
 
     public void selectRandomDrink()
     {
@@ -29,11 +33,12 @@ public class DrinkSelector : MonoBehaviour
     public async void goToDrink(string name)
     {
         Menu.SetActive(false);
+        Loading.SetActive(true);
         Card.SetActive(true);
-        Debug.Log(name);
         description.text = await Task.Run(() => interneter.getCocktailDescription(name));
+        scrollbarText.value = 1;
         title.text = name;
-        //interneter.createImages(name, 10);
+        interneter.imageTest(name + "+%2B+cocktail", 15);
     }
 
     // Start is called before the first frame update

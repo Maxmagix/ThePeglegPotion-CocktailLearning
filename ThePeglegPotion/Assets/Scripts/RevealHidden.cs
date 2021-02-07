@@ -13,6 +13,10 @@ public class RevealHidden : MonoBehaviour
     private Image scroll;
     [SerializeField]
     private Color[] colorState;
+    [SerializeField]
+    private GameObject cross;
+    [SerializeField]
+    private GameObject questionMark;
 
     [SerializeField]
     private VisibilityChecker visibility;
@@ -28,6 +32,8 @@ public class RevealHidden : MonoBehaviour
         stateChecked = state;
         images.SetActive(stateChecked);
         text.SetActive(stateChecked);
+        cross.SetActive(!stateChecked);
+        questionMark.SetActive(!stateChecked);
         scroll.color = colorState[(stateChecked ? 0 : 1)];
     }
 
