@@ -27,7 +27,8 @@ public class HttpContentGetter : MonoBehaviour
     [SerializeField]
     private GameObject CancelLoadCross;
 
-    private htmlParser html = new htmlParser();
+    [SerializeField]
+    private htmlParser html;
 
     static string textResult = "";
     private int pageLoaded = 0;
@@ -60,6 +61,7 @@ public class HttpContentGetter : MonoBehaviour
             GameObject instImg = Instantiate(ImagePrefab);
             instImg.transform.SetParent(ImageParent.transform);
             instImg.transform.GetComponent<Image>().sprite = sprite;
+            instImg.transform.localScale = new Vector3(1, 1, 1);
         }
     }
 
